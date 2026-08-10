@@ -19,6 +19,7 @@ AES_KEY = AES_KEY_STRING.encode('utf-8')
 
 KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
 KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
 
 class UserCreate(BaseModel):
     userid: str = Field(min_length=4, max_length=15)
@@ -102,6 +103,7 @@ def kakao_callback(code: str, db: Session = Depends(get_db)):
         data={
             "grant_type": "authorization_code",
             "client_id": KAKAO_CLIENT_ID,
+            "client_secret": KAKAO_CLIENT_SECRET,
             "redirect_uri": KAKAO_REDIRECT_URI,
             "code": code
         }
