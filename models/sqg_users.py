@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.sql import func
+# 최상단의 database.py에서 Base를 가져옵니다.
 from database import Base
 
 class User(Base):
