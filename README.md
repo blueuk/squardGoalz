@@ -47,7 +47,6 @@ git clone (여기에_우리팀_깃허브_주소를_넣어주세요)
 
 우리 프로젝트만의 독립적인 놀이터(가상 환경)를 만들고 필요한 부품을 조립할 차례입니다.
 VS Code에서 `터미널` > `새 터미널`을 엽니다.
-
 ### 1. 가상 환경 만들기 및 켜기
 ```bash
 # 놀이터(가상 환경) 만들기
@@ -65,6 +64,11 @@ source venv/bin/activate
 `(venv)`가 켜진 상태에서 아래 명령어를 복사해 붙여넣고 Enter를 칩니다.
 ```bash
 pip install "fastapi[standard]" psycopg2-binary python-dotenv cryptography sqlalchemy alembic
+
+pip install --upgrade fastapi pydantic typing-extensions
+pip install --force-reinstall fastapi pydantic typing-extensions
+
+pip install -r requirements.txt
 ```
 
 ---
@@ -131,3 +135,9 @@ git commit -m "내가 무엇을 수정했는지 여기에 적습니다 (예: 로
 git push
 ```
 *(에러가 나면 팀장님을 부르세요!)*
+
+# 1. 가상환경 비활성화
+deactivate
+
+# 2. venv 폴더 삭제 (Windows 명령어)
+rm -r -force venv

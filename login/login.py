@@ -3,9 +3,10 @@ import base64
 from fastapi import APIRouter, HTTPException, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-import requests
+import httpx
 
 from database import get_db
 from models import User
@@ -46,15 +47,17 @@ def decrypt_password_aes(encrypted_password: str) -> str:
     return aesgcm.decrypt(nonce, ciphertext, None).decode('utf-8')
 
 @router.get("/users/{userid}")
-def get_user_info(userid: str, db: Session = Depends(get_db)):
-    user_data = db.query(User).filter(User.userid == userid).first()
+async def get_user_info(userid: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).filter(User.userid == userid))
+    user_data = result.scalars().first()
     if not user_data:
         raise HTTPException(status_code=404, detail="해당 유저를 찾을 수 없습니다.")
     return user_data
 
 @router.post("/users")
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.userid == user.userid).first()
+async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).filter(User.userid == user.userid))
+    existing_user = result.scalars().first()
     if existing_user:
         raise HTTPException(status_code=400, detail="이미 존재하는 아이디입니다.")
 
@@ -63,15 +66,16 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     
     try:
         db.add(db_user)
-        db.commit()
+        await db.commit()
         return {"message": "유저가 성공적으로 생성되었습니다.", "userid": db_user.userid}
     except Exception:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail="회원가입 중 오류가 발생했습니다.")
 
 @router.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    user_data = db.query(User).filter(User.userid == user.userid).first()
+async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).filter(User.userid == user.userid))
+    user_data = result.scalars().first()
     if not user_data:
         raise HTTPException(status_code=401, detail="존재하지 않는 아이디입니다.")
     
@@ -86,9 +90,8 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     return {"message": "로그인 성공!", "username": user_data.username}
 
 @router.get("/kakao/login")
-def kakao_login():
+async def kakao_login():
     """카카오 로그인 창으로 유저를 보냅니다."""
-    # 환경변수가 잘 들어왔는지 확인
     if not KAKAO_CLIENT_ID or not KAKAO_REDIRECT_URI:
         raise HTTPException(status_code=500, detail="카카오 설정값(ENV)이 누락되었습니다. .env 파일을 확인해주세요.")
         
@@ -96,35 +99,38 @@ def kakao_login():
     return RedirectResponse(url=kakao_auth_url)
 
 @router.get("/kakao/callback", response_class=HTMLResponse)
-def kakao_callback(code: str, db: Session = Depends(get_db)):
-    token_response = requests.post(
-        "https://kauth.kakao.com/oauth/token",
-        headers={"Content-type": "application/x-www-form-urlencoded;charset=utf-8"},
-        data={
-            "grant_type": "authorization_code",
-            "client_id": KAKAO_CLIENT_ID,
-            "client_secret": KAKAO_CLIENT_SECRET,
-            "redirect_uri": KAKAO_REDIRECT_URI,
-            "code": code
-        }
-    )
-    token_data = token_response.json()
-    access_token = token_data.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=400, detail=f"토큰 발급 실패: {token_data}")
+async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://kauth.kakao.com/oauth/token",
+            headers={"Content-type": "application/x-www-form-urlencoded;charset=utf-8"},
+            data={
+                "grant_type": "authorization_code",
+                "client_id": KAKAO_CLIENT_ID,
+                "client_secret": KAKAO_CLIENT_SECRET,
+                "redirect_uri": KAKAO_REDIRECT_URI,
+                "code": code
+            }
+        )
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail=f"토큰 발급 실패: {token_data}")
 
-    user_info_response = requests.get(
-        "https://kapi.kakao.com/v2/user/me",
-        headers={"Authorization": f"Bearer {access_token}",
-                 "Content-type": "application/x-www-form-urlencoded;charset=utf-8"}
-    )
-    user_info = user_info_response.json()
+        user_info_response = await client.get(
+            "https://kapi.kakao.com/v2/user/me",
+            headers={"Authorization": f"Bearer {access_token}",
+                     "Content-type": "application/x-www-form-urlencoded;charset=utf-8"}
+        )
+        user_info = user_info_response.json()
+        
     kakao_id = user_info.get("id")
     if not kakao_id:
         raise HTTPException(status_code=400, detail=f"유저 정보 조회 실패: {user_info}")
 
     db_userid = f"kakao_{kakao_id}"
-    existing_user = db.query(User).filter(User.userid == db_userid).first()
+    result = await db.execute(select(User).filter(User.userid == db_userid))
+    existing_user = result.scalars().first()
 
     if existing_user:
         return f"""
@@ -157,8 +163,10 @@ def kakao_callback(code: str, db: Session = Depends(get_db)):
     """
 
 @router.post("/kakao/register")
-def kakao_register(userid: str = Form(...), realname: str = Form(...), db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.userid == userid).first()
+async def kakao_register(userid: str = Form(...), realname: str = Form(...), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).filter(User.userid == userid))
+    existing_user = result.scalars().first()
+    
     if existing_user:
         return {"message": "이미 가입된 회원입니다.", "username": existing_user.username}
 
@@ -170,7 +178,7 @@ def kakao_register(userid: str = Form(...), realname: str = Form(...), db: Sessi
     )
     
     db.add(new_user)
-    db.commit()
+    await db.commit()
 
     return {
         "message": "회원가입 및 실명 등록 성공!",
