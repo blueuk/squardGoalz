@@ -7,6 +7,7 @@ from user.userController import router as user_router
 from kakao.kakaoController import router as kakao_router
 from login.loginController import router as login_router
 from common_cd.commonCdController import router as common_cd_router
+from position_point.positionController import router as position_router
 
 # 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
 @asynccontextmanager
@@ -33,6 +34,7 @@ app.include_router(user_router)
 app.include_router(kakao_router)
 app.include_router(login_router)
 app.include_router(common_cd_router)
+app.include_router(position_router)
 
 @app.get("/")
 async def root():
