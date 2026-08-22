@@ -1,6 +1,7 @@
 import os
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import engine, Base
 from user.userController import router as user_router
@@ -10,6 +11,9 @@ from common_cd.commonCdController import router as common_cd_router
 from position_point.positionController import router as position_router
 from teamInfo.teamInfoController import router as team_info_router
 from teamMember.teamMemberController import router as team_member_router
+
+# 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
+@asynccontextmanager
 from teamAccount.teamAccountController import router as team_account_router
 from teamArrange.teamArrangeController import router as team_arrange_router
 from memberScore.memberScoreController import router as member_score_router
@@ -34,6 +38,21 @@ app = FastAPI(title="Squard Goalz API", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware, 
     secret_key=os.getenv("AES_SECRET_KEY", "default-secret-key-for-session")
+)
+
+# 허용할 프론트엔드 주소 지정
+origins = [
+    "http://localhost:3000",  # Create React App 기본 포트
+    "http://localhost:5173",  # Vite 기본 포트
+]
+
+# CORS 미들웨어 등록 (프론트엔드와의 통신을 위해 필요)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 # 라우터 연결
