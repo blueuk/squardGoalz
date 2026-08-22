@@ -1,7 +1,11 @@
+import os
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import engine, Base
-from login.controller import router as login_router
+from user.userController import router as user_router
+from kakao.kakaoController import router as kakao_router
+from login.loginController import router as login_router
 
 # 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
 @asynccontextmanager
@@ -17,7 +21,15 @@ async def lifespan(app: FastAPI):
 # 메인 앱 생성 (lifespan 연동)
 app = FastAPI(title="Squard Goalz API", lifespan=lifespan)
 
+# 세션 미들웨어 등록 (세션 쿠키 관리에 필요)
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=os.getenv("AES_SECRET_KEY", "default-secret-key-for-session")
+)
+
 # 라우터 연결
+app.include_router(user_router)
+app.include_router(kakao_router)
 app.include_router(login_router)
 
 @app.get("/")
