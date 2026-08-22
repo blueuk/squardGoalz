@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import engine, Base
-from login.login import router as login_router
+from login.controller import router as login_router
 
 # 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
 @asynccontextmanager
