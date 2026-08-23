@@ -12,8 +12,6 @@ from position_point.positionController import router as position_router
 from teamInfo.teamInfoController import router as team_info_router
 from teamMember.teamMemberController import router as team_member_router
 
-# 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
-@asynccontextmanager
 from teamAccount.teamAccountController import router as team_account_router
 from teamArrange.teamArrangeController import router as team_arrange_router
 from memberScore.memberScoreController import router as member_score_router
@@ -22,6 +20,10 @@ from record.recordController import router as record_router
 from schedule.scheduleController import router as schedule_router
 from stardium.stardiumController import router as stardium_router
 from vote.voteController import router as vote_router
+from rate.rateController import router as rate_router
+
+# 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 실행될 로직
     # 주의: Alembic으로 마이그레이션을 관리한다면 아래 주석 처리된 부분은 사용하지 않는 것이 좋습니다.
@@ -71,6 +73,7 @@ app.include_router(record_router)
 app.include_router(schedule_router)
 app.include_router(stardium_router)
 app.include_router(vote_router)
+app.include_router(rate_router)
 
 @app.get("/")
 async def root():
