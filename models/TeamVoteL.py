@@ -12,7 +12,7 @@ class TeamVoteL(Base):
     play_date = Column(String(8), comment='경기일자')
     play_start_time = Column(String(10), comment='경기시작시간')
     play_end_time = Column(String(10), comment='경기종료시간')
-    member_uid = Column(String(50), comment='멤버아이디')
+    member_uid = Column(String(50), primary_key=True, comment='멤버아이디')
     vote_cd = Column(String(20), comment='투표코드')
     create_id = Column(String(50), comment='등록자')
     create_dt = Column(DateTime, comment='등록시간')
