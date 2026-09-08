@@ -36,13 +36,14 @@ async def update(db: AsyncSession, req: voteRequest.VoteUpdateRequest, session_i
     query = select(TeamVoteL)
     query = query.filter(TeamVoteL.vote_seq == req.vote_seq)
     query = query.filter(TeamVoteL.team_uid == req.team_uid)
+    if req.member_uid is not None:
+        query = query.filter(TeamVoteL.member_uid == req.member_uid)
     result = await db.execute(query)
     obj = result.scalars().first()
     if not obj: raise ValueError('Not found')
     if req.play_date is not None: obj.play_date = req.play_date
     if req.play_start_time is not None: obj.play_start_time = req.play_start_time
     if req.play_end_time is not None: obj.play_end_time = req.play_end_time
-    if req.member_uid is not None: obj.member_uid = req.member_uid
     if req.vote_cd is not None: obj.vote_cd = req.vote_cd
     if hasattr(obj, 'update_id'): obj.update_id = session_id
     if hasattr(obj, 'update_dt'): obj.update_dt = datetime.now()

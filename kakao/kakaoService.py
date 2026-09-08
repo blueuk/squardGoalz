@@ -3,27 +3,31 @@ import httpx
 from typing import Dict, Any
 
 KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
-KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI")
+# 기존 환경변수에 남아있는 127.0.0.1 캐시를 무시하고 코드 레벨에서 강제로 localhost로 고정합니다.
+KAKAO_REDIRECT_URI = "http://localhost:8000/kakao/callback"
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
 
 def get_kakao_auth_url() -> str:
-    if not KAKAO_CLIENT_ID or not KAKAO_REDIRECT_URI:
+    if not KAKAO_CLIENT_ID:
         raise ValueError("카카오 설정값(ENV)이 누락되었습니다.")
     return f"https://kauth.kakao.com/oauth/authorize?client_id={KAKAO_CLIENT_ID}&redirect_uri={KAKAO_REDIRECT_URI}&response_type=code"
 
 async def get_kakao_user_info(code: str) -> Dict[str, Any]:
     async with httpx.AsyncClient() as client:
         # 1. 인가 코드로 토큰 발급
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": KAKAO_CLIENT_ID,
+            "redirect_uri": KAKAO_REDIRECT_URI,
+            "code": code
+        }
+        if KAKAO_CLIENT_SECRET:
+            data["client_secret"] = KAKAO_CLIENT_SECRET
+            
         token_response = await client.post(
             "https://kauth.kakao.com/oauth/token",
             headers={"Content-type": "application/x-www-form-urlencoded;charset=utf-8"},
-            data={
-                "grant_type": "authorization_code",
-                "client_id": KAKAO_CLIENT_ID,
-                "client_secret": KAKAO_CLIENT_SECRET,
-                "redirect_uri": KAKAO_REDIRECT_URI,
-                "code": code
-            }
+            data=data
         )
         token_data = token_response.json()
         access_token = token_data.get("access_token")
