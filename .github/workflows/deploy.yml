@@ -32,7 +32,7 @@ jobs:
             # 최신 코드 가져오기
             git pull origin main
             
-            # Secrets 값을 이용해 .env 파일 동적 생성 (> 는 덮어쓰기, >> 는 이어쓰기)
+            # Secrets 값을 이용해 .env 파일 동적 생성
             echo "AES_SECRET_KEY=$AES_SECRET_KEY" > .env
             echo "DB_HOST=$DB_HOST" >> .env
             echo "DB_NAME=$DB_NAME" >> .env
@@ -46,7 +46,8 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 기존 구동 중인 서버 종료 후 재실행
-            pkill -f uvicorn || true
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 &
-
+            # pkill 대신 8000번 포트를 사용하는 프로세스만 정확히 찾아서 종료
+            fuser -k 8000/tcp || true
+            
+            # 서버 백그라운드 재실행 (SSH 세션이 멈추지 않도록 </dev/null 추가)
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 </dev/null &
