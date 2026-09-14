@@ -48,8 +48,11 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # pkill 대신 8000번 포트를 사용하는 프로세스만 정확히 찾아서 종료
+            # 프로세스 확실히 종료 (fuser가 없을 경우 대비 pkill 및 lsof 추가)
             fuser -k 8000/tcp || true
+            pkill -f "uvicorn main:app" || true
+            kill -9 $(lsof -t -i:8000) || true
+            sleep 2
             
             # 서버 백그라운드 재실행 (SSH 세션이 멈추지 않도록 </dev/null 추가)
             nohup uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 </dev/null &
