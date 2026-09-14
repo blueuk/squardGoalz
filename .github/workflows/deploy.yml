@@ -60,8 +60,8 @@ jobs:
             # 기존 tmux 세션이 있다면 종료
             tmux kill-session -t backend || true
             
-            # 새 tmux 세션에서 uvicorn 실행 (로그는 nohup.out에 남김)
-            tmux new-session -d -s backend "uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1"
+            # 새 tmux 세션에서 절대 경로로 uvicorn 실행 (가상환경 문제 방지)
+            tmux new-session -d -s backend "$(pwd)/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1"
             
             echo "Deployment completed successfully."
             exit 0
