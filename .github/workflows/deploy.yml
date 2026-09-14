@@ -20,12 +20,13 @@ jobs:
           KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         with:
           host: ${{ secrets.GCP_VM_IP }}
           username: ${{ secrets.GCP_USERNAME }}
           key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
-          # 위 env에서 정의한 변수들을 script 환경으로 넘겨줍니다.
-          envs: AES_SECRET_KEY, DB_HOST, DB_NAME, DB_PASSWORD, DB_USER, KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI
+          # 💡 env에서 정의한 변수들을 script 환경으로 넘겨줍니다.
+          envs: AES_SECRET_KEY, DB_HOST, DB_NAME, DB_PASSWORD, DB_USER, KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI, FRONTEND_URL
           script: |
             cd ~/squardGoalz
             
@@ -41,6 +42,7 @@ jobs:
             echo "KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID" >> .env
             echo "KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET" >> .env
             echo "KAKAO_REDIRECT_URI=$KAKAO_REDIRECT_URI" >> .env
+            echo "FRONTEND_URL=$FRONTEND_URL" >> .env
             
             # 가상환경 활성화 및 패키지 설치
             source venv/bin/activate
