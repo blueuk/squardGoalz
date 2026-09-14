@@ -1,0 +1,52 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          AES_SECRET_KEY: ${{ secrets.AES_SECRET_KEY }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          # 위 env에서 정의한 변수들을 script 환경으로 넘겨줍니다.
+          envs: AES_SECRET_KEY, DB_HOST, DB_NAME, DB_PASSWORD, DB_USER, KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI
+          script: |
+            cd ~/squardGoalz
+            
+            # 최신 코드 가져오기
+            git pull origin main
+            
+            # Secrets 값을 이용해 .env 파일 동적 생성 (> 는 덮어쓰기, >> 는 이어쓰기)
+            echo "AES_SECRET_KEY=$AES_SECRET_KEY" > .env
+            echo "DB_HOST=$DB_HOST" >> .env
+            echo "DB_NAME=$DB_NAME" >> .env
+            echo "DB_PASSWORD=$DB_PASSWORD" >> .env
+            echo "DB_USER=$DB_USER" >> .env
+            echo "KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID" >> .env
+            echo "KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET" >> .env
+            echo "KAKAO_REDIRECT_URI=$KAKAO_REDIRECT_URI" >> .env
+            
+            # 가상환경 활성화 및 패키지 설치
+            source venv/bin/activate
+            pip install -r requirements.txt
+            
+            # 기존 구동 중인 서버 종료 후 재실행
+            pkill -f uvicorn || true
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 &
+
