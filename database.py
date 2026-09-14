@@ -14,7 +14,14 @@ DB_NAME = os.getenv("DB_NAME")
 SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
 # echo=True 설정으로 SQL 쿼리 로그를 출력합니다.
-engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True, future=True)
+# Neon DB 특성상 유휴 연결이 끊길 수 있으므로 pool_pre_ping=True, pool_recycle=1800 옵션을 추가합니다.
+engine = create_async_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    echo=True, 
+    future=True,
+    pool_pre_ping=True,
+    pool_recycle=1800
+)
 
 # 비동기 세션을 생성하는 팩토리
 async_session = async_sessionmaker(

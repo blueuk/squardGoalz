@@ -12,6 +12,7 @@ class TeamScheduleL(Base):
     play_date = Column(String(8), comment='경기일자')
     play_start_time = Column(String(10), comment='경기시작시간')
     play_end_time = Column(String(10), comment='경기종료시간')
+    play_location = Column(String(100), comment='장소')
     vote_period_from = Column(String(14), comment='투표기간from')
     vote_period_to = Column(String(14), comment='투표기간to')
     vote_end_yn = Column(String(1), comment='투표종료여부')

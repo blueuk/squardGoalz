@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class VoteResponse(BaseModel):
-    vote_seq: Optional[str] = None
+    vote_seq: int
     team_uid: Optional[str] = None
     play_date: Optional[str] = None
     play_start_time: Optional[str] = None
@@ -11,9 +11,9 @@ class VoteResponse(BaseModel):
     member_uid: Optional[str] = None
     vote_cd: Optional[str] = None
     create_id: Optional[str] = None
-    create_dt: Optional[str] = None
+    create_dt: Optional[datetime] = None
     update_id: Optional[str] = None
-    update_dt: Optional[str] = None
+    update_dt: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

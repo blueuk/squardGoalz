@@ -46,6 +46,7 @@ app.add_middleware(
 origins = [
     "http://localhost:3000",  # Create React App 기본 포트
     "http://localhost:5173",  # Vite 기본 포트
+    "http://127.0.0.1:5173",
 ]
 
 # CORS 미들웨어 등록 (프론트엔드와의 통신을 위해 필요)

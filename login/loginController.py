@@ -23,44 +23,17 @@ async def process_kakao_login(request: Request, db: AsyncSession = Depends(get_d
     is_member = await loginService.process_login(db, userid, client_ip)
     
     if is_member:
-        return HTMLResponse(f"""
-        <html>
-            <body style="font-family: Arial; text-align: center; margin-top: 50px;">
-                <h2>🎉 로그인 성공!</h2>
-                <p>스쿼드 골츠에 다시 오신 것을 환영합니다!</p>
-            </body>
-        </html>
-        """)
+        # 로그인 성공 시 리액트 프론트엔드로 리다이렉트
+        return RedirectResponse(url="http://localhost:5173/")
     else:
-        # 2. 회원이 아니라면 가입 폼 제공
-        return HTMLResponse(f"""
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>추가 정보 입력</title>
-            </head>
-            <body style="font-family: Arial; text-align: center; margin-top: 50px;">
-                <h2>⚽ 스쿼드 골츠 회원가입</h2>
-                <p>카카오 인증이 완료되었습니다. 서비스 이용을 위해 추가 정보를 입력해주세요!</p>
-                
-                <form action="/login/register" method="POST" style="margin-top: 20px;">
-                    <input type="hidden" name="userid" value="{userid}">
-                    
-                    <div style="margin-bottom: 10px;">
-                        <label>이름(실명): <input type="text" name="username" required></label>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label>닉네임: <input type="text" name="nickname" value="{nickname}" required></label>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label>전화번호: <input type="text" name="phone" placeholder="010-1234-5678" required></label>
-                    </div>
-                    
-                    <button type="submit" style="padding: 10px 20px; font-size: 16px; background-color: #FEE500; border: none; cursor: pointer; font-weight: bold; margin-top: 10px;">가입 완료하기</button>
-                </form>
-            </body>
-        </html>
-        """)
+        # 2. 회원이 아니라면 가입 폼 제공 (임시로 리액트 회원가입 페이지로 리다이렉트 하거나 HTML 유지)
+        # 지금은 바로 리액트의 /register 화면 등으로 보내는 것이 좋으나, 
+        # HTML 폼이 구현되어 있으므로 당장은 HTML 폼을 유지하거나 리액트 주소로 리다이렉트 가능합니다.
+        # 이번에는 간단히 프론트엔드의 /register 페이지로 userid, nickname 파라미터와 함께 넘겨주겠습니다.
+        from urllib.parse import urlencode
+        params = urlencode({"userid": userid, "nickname": nickname})
+        return RedirectResponse(url=f"http://localhost:5173/register?{params}")
+
 
 @router.post("/register")
 async def register(
@@ -81,13 +54,5 @@ async def register(
     
     await userService.insert_user(db, req)
     
-    return HTMLResponse(f"""
-    <html>
-        <body style="font-family: Arial; text-align: center; margin-top: 50px;">
-            <h2>🎉 회원가입 완료!</h2>
-            <p>{nickname}님, 스쿼드 골츠의 멤버가 되신 것을 환영합니다!</p>
-            <a href="/login/kakao/process" style="display:inline-block; margin-top: 20px; padding: 10px; background:#ddd; text-decoration:none; color:black;">로그인 하러가기</a>
-        </body>
-    </html>
-    """)
+    return {"message": "회원가입이 완료되었습니다."}
 

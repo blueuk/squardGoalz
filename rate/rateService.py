@@ -12,6 +12,9 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
                 m.team_uid,
                 m.member_uid,
                 m.member_name,
+                m.user_id,
+                m.status_cd,
+                (SELECT code_name FROM common_cd_b WHERE code = m.status_cd AND group_cd = 'MEMBER_STATUS' LIMIT 1) AS code_name,
                 COUNT(v.vote_seq) AS total_matches,
                 COALESCE(SUM(CASE WHEN v.vote_cd = '02' THEN 1 ELSE 0 END), 0) AS attend_count,
                 COALESCE(SUM(CASE WHEN v.vote_cd = '03' THEN 1 ELSE 0 END), 0) AS absent_count,
@@ -34,7 +37,7 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
         params["teamname"] = req.teamname
         
     base_sql += """
-            GROUP BY m.team_uid, m.member_uid, m.member_name
+            GROUP BY m.team_uid, m.member_uid, m.member_name, m.user_id, m.status_cd
         ),
         ranked_stats AS (
             SELECT 
@@ -75,13 +78,20 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
             team_uid=row.team_uid,
             member_uid=row.member_uid,
             member_name=row.member_name,
+            user_id=row.user_id,
             total_matches=row.total_matches or 0,
             attend_count=row.attend_count or 0,
             absent_count=row.absent_count or 0,
             no_vote_count=row.no_vote_count or 0,
             attend_rate=float(row.attend_rate) if row.attend_rate else 0.0,
             total_score=row.total_score or 0,
-            rank_num=row.rank_num or 0
+            rank_num=row.rank_num or 0,
+            status_cd=row.status_cd,
+            code_name=row.code_name or (
+                '활동' if row.status_cd == '01' else 
+                '부상' if row.status_cd == '02' else 
+                '휴식' if row.status_cd == '03' else ''
+            )
         ) for row in rows
     ]
 

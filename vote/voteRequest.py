@@ -2,11 +2,11 @@ from pydantic import BaseModel
 from typing import Optional
 
 class VoteSearchRequest(BaseModel):
-    vote_seq: Optional[str] = None
+    vote_seq: Optional[int] = None
     team_uid: Optional[str] = None
 
 class VoteInsertRequest(BaseModel):
-    vote_seq: str
+    vote_seq: int
     team_uid: str
     play_date: Optional[str] = None
     play_start_time: Optional[str] = None
@@ -15,7 +15,7 @@ class VoteInsertRequest(BaseModel):
     vote_cd: Optional[str] = None
 
 class VoteUpdateRequest(BaseModel):
-    vote_seq: str
+    vote_seq: int
     team_uid: str
     play_date: Optional[str] = None
     play_start_time: Optional[str] = None
@@ -24,5 +24,5 @@ class VoteUpdateRequest(BaseModel):
     vote_cd: Optional[str] = None
 
 class VoteDeleteRequest(BaseModel):
-    vote_seq: str
+    vote_seq: int
     team_uid: str
