@@ -3,8 +3,7 @@ import httpx
 from typing import Dict, Any
 
 KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
-# 기존 환경변수에 남아있는 127.0.0.1 캐시를 무시하고 코드 레벨에서 강제로 localhost로 고정합니다.
-KAKAO_REDIRECT_URI = "http://localhost:8000/kakao/callback"
+KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI", "http://localhost:8000/kakao/callback")
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
 
 def get_kakao_auth_url() -> str:
