@@ -48,7 +48,7 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 프로세스 확실히 종료 (fuser 없을 경우 대비)
+            # 프로세스 확실히 종료
             pkill -f "uvicorn main:app" || true
             PID=$(lsof -t -i:8000 || echo "")
             if [ ! -z "$PID" ]; then
@@ -56,7 +56,12 @@ jobs:
             fi
             sleep 2
             
-            # 서버 백그라운드 재실행 (완전 독립 실행을 위해 nohup 사용)
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 </dev/null &
-            sleep 2
+            # tmux를 사용하여 SSH 세션과 완전히 독립된 백그라운드 실행 (143 에러 방지)
+            # 기존 tmux 세션이 있다면 종료
+            tmux kill-session -t backend || true
+            
+            # 새 tmux 세션에서 uvicorn 실행 (로그는 nohup.out에 남김)
+            tmux new-session -d -s backend "uvicorn main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1"
+            
+            echo "Deployment completed successfully."
             exit 0
