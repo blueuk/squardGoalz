@@ -15,8 +15,8 @@ class PaymentInsertRequest(BaseModel):
 class PaymentUpdateRequest(BaseModel):
     team_uid: str
     payment_cd: str
-    team_account_seq: str
-    amount: Optional[str] = None
+    team_account_seq: int
+    amount: Optional[float] = None
 
 class PaymentDeleteRequest(BaseModel):
     team_uid: str
