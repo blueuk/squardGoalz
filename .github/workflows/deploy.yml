@@ -48,12 +48,19 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 기존 프로세스 확실히 종료 (lsof가 없을 수도 있으므로 fuser 사용 또는 직접 포트 죽이기)
-            fuser -k -n tcp 8000 || true
-            PID=$(lsof -t -i:8000 || echo "")
-            if [ ! -z "$PID" ]; then
-              kill -9 $PID || true
-            fi
+            # 기존 프로세스 확실히 종료 (Python을 이용해 8000번 포트 프로세스 찾아서 죽이기)
+            python3 -c "
+import psutil
+for conn in psutil.net_connections():
+    if conn.laddr.port == 8000 and conn.status == 'LISTEN':
+        try:
+            psutil.Process(conn.pid).terminate()
+        except:
+            pass
+" || true
+            # psutil이 없을 경우를 대비한 netstat 백업
+            PID=$(netstat -nlp 2>/dev/null | grep ':8000' | awk '{print $7}' | cut -d'/' -f1 || echo "")
+            if [ ! -z "$PID" ]; then kill -9 $PID || true; fi
             sleep 2
             
             # 가상환경에서 Uvicorn 실행 (nohup과 /dev/null을 이용해 SSH 세션과 완벽 분리)
