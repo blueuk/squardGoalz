@@ -29,8 +29,9 @@ jobs:
           envs: AES_SECRET_KEY, DB_HOST, DB_NAME, DB_PASSWORD, DB_USER, KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI, FRONTEND_URL
           script: |
             cd ~/squardGoalz
-            
-            # 최신 코드 가져오기
+            # 최신 코드 가져오기 및 강제 덮어쓰기 (로컬 충돌 방지)
+            git fetch --all
+            git reset --hard origin/main
             git pull origin main
             
             # Secrets 값을 이용해 .env 파일 동적 생성
