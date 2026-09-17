@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update as sql_update
 from datetime import datetime
 from models.TeamAccountL import TeamAccountL
 from teamAccount import teamAccountRequest
@@ -33,18 +33,20 @@ async def insert(db: AsyncSession, req: teamAccountRequest.TeamaccountInsertRequ
     return obj
 
 async def update(db: AsyncSession, req: teamAccountRequest.TeamaccountUpdateRequest, session_id: str):
-    query = select(TeamAccountL)
-    query = query.filter(TeamAccountL.team_uid == req.team_uid)
-    query = query.filter(TeamAccountL.team_account_seq == req.team_account_seq)
-    query = query.filter(TeamAccountL.bank_cd == req.bank_cd)
-    query = query.filter(TeamAccountL.account_enc == req.account_enc)
-    result = await db.execute(query)
-    obj = result.scalars().first()
-    if not obj: raise ValueError('Not found')
-    if hasattr(obj, 'update_id'): obj.update_id = session_id
-    if hasattr(obj, 'update_dt'): obj.update_dt = datetime.now()
+    stmt = sql_update(TeamAccountL).where(
+        TeamAccountL.team_uid == req.team_uid,
+        TeamAccountL.team_account_seq == req.team_account_seq
+    ).values(
+        bank_cd=req.bank_cd,
+        account_enc=req.account_enc,
+        update_id=session_id,
+        update_dt=datetime.now()
+    )
+    res = await db.execute(stmt)
+    if res.rowcount == 0:
+        raise ValueError('Not found')
     await db.commit()
-    return obj
+    return True
 
 async def delete_obj(db: AsyncSession, req: teamAccountRequest.TeamaccountDeleteRequest):
     query = delete(TeamAccountL)
