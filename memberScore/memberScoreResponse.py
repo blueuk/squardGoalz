@@ -7,11 +7,11 @@ class MemberscoreResponse(BaseModel):
     team_uid: Optional[str] = None
     year: Optional[str] = None
     score_cd: Optional[str] = None
-    score_val: Optional[str] = None
+    score_val: Optional[float] = None
     create_id: Optional[str] = None
-    create_dt: Optional[str] = None
+    create_dt: Optional[datetime] = None
     update_id: Optional[str] = None
-    update_dt: Optional[str] = None
+    update_dt: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
