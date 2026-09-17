@@ -1,7 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from datetime import datetime
+from sqlalchemy import select, update
+from datetime import datetime
+import uuid
 from models.UserB import UserB
+from models.TeamMemberL import TeamMemberL
+from models.TeamInfoB import TeamInfoB
 from models.UserH import UserH
 from user.userRequest import UserInsertRequest, UserUpdateRequest
 
@@ -43,6 +48,35 @@ async def insert_user(db: AsyncSession, req: UserInsertRequest):
     db.add(user_h)
     
     await db.commit()
+    
+    # 3. TeamMemberL 연동 또는 자동 등록
+    result = await db.execute(select(TeamMemberL).where(TeamMemberL.member_name == req.username))
+    members = result.scalars().all()
+    
+    if members:
+        # 4. 존재하면 해당 멤버들의 user_id를 업데이트
+        for m in members:
+            m.user_id = req.userid
+        await db.commit()
+    else:
+        # 5. 존재하지 않으면 기본 팀(첫 번째 팀)에 멤버로 새로 추가
+        team_result = await db.execute(select(TeamInfoB).where(TeamInfoB.use_yn == 'Y'))
+        first_team = team_result.scalars().first()
+        if first_team:
+            new_member = TeamMemberL(
+                team_uid=first_team.team_uid,
+                member_uid=str(uuid.uuid4()),
+                member_name=req.username,
+                user_id=req.userid,
+                sign_dt=now.strftime('%Y%m%d%H%M%S'),
+                gender_cd='01',  # 기본값
+                status_cd='01',  # 활동중
+                create_id='system',
+                create_dt=now
+            )
+            db.add(new_member)
+            await db.commit()
+            
     return user_b
 
 async def get_users(db: AsyncSession, userid: str = None, username: str = None, nickname: str = None, phone: str = None):
