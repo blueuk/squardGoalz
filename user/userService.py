@@ -6,6 +6,8 @@ from datetime import datetime
 import uuid
 from models.UserB import UserB
 from models.TeamMemberL import TeamMemberL
+from models.TeamMemberScoreL import TeamMemberScoreL
+from models.CommonCdB import CommonCdB
 from models.TeamInfoB import TeamInfoB
 from models.UserH import UserH
 from user.userRequest import UserInsertRequest, UserUpdateRequest
@@ -63,9 +65,10 @@ async def insert_user(db: AsyncSession, req: UserInsertRequest):
         team_result = await db.execute(select(TeamInfoB).where(TeamInfoB.use_yn == 'Y'))
         first_team = team_result.scalars().first()
         if first_team:
+            new_uid = str(uuid.uuid4())
             new_member = TeamMemberL(
                 team_uid=first_team.team_uid,
-                member_uid=str(uuid.uuid4()),
+                member_uid=new_uid,
                 member_name=req.username,
                 user_id=req.userid,
                 sign_dt=now.strftime('%Y%m%d%H%M%S'),
@@ -75,6 +78,23 @@ async def insert_user(db: AsyncSession, req: UserInsertRequest):
                 create_dt=now
             )
             db.add(new_member)
+            
+            # 신규 멤버에게 모든 score_cd에 대해 13점 기본값 부여
+            score_cds = (await db.execute(select(CommonCdB).where(CommonCdB.group_cd == 'score_cd'))).scalars().all()
+            for sc in score_cds:
+                score_obj = TeamMemberScoreL(
+                    member_uid=new_uid,
+                    team_uid=first_team.team_uid,
+                    year='2026',
+                    score_cd=sc.code,
+                    score_val=13,
+                    create_id='system',
+                    create_dt=now,
+                    update_id='system',
+                    update_dt=now
+                )
+                db.add(score_obj)
+            
             await db.commit()
             
     return user_b

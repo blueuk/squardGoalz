@@ -3,6 +3,8 @@ from sqlalchemy import select, update
 from datetime import datetime
 import uuid
 from models.TeamMemberL import TeamMemberL
+from models.CommonCdB import CommonCdB
+from models.TeamMemberScoreL import TeamMemberScoreL
 from models.TeamInfoB import TeamInfoB
 from teamMember import teamMemberRequest
 
@@ -33,6 +35,9 @@ async def insert_team_members(db: AsyncSession, req: teamMemberRequest.TeamMembe
     now = datetime.now()
     sign_date_str = now.strftime("%Y%m%d%H%M%S") # 14자리 YYYYMMDDHHMMSS
     
+    # 스코어 코드 목록 미리 가져오기
+    score_cds = (await db.execute(select(CommonCdB).where(CommonCdB.group_cd == 'score_cd'))).scalars().all()
+
     for member in req.members:
         # 멤버 고유 UID 발급
         new_member_uid = str(uuid.uuid4())
@@ -50,6 +55,21 @@ async def insert_team_members(db: AsyncSession, req: teamMemberRequest.TeamMembe
         )
         db.add(obj)
         
+        # 신규 멤버에게 모든 score_cd에 대해 13점 기본값 부여
+        for sc in score_cds:
+            score_obj = TeamMemberScoreL(
+                member_uid=new_member_uid,
+                team_uid=member.team_uid,
+                year='2026',
+                score_cd=sc.code,
+                score_val=13,
+                create_id=session_id,
+                create_dt=now,
+                update_id=session_id,
+                update_dt=now
+            )
+            db.add(score_obj)
+            
     await db.commit()
 
 async def update_team_member(db: AsyncSession, req: teamMemberRequest.TeamMemberUpdateRequest):
