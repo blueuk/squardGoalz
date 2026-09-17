@@ -50,17 +50,19 @@ jobs:
             pip install -r requirements.txt
             
             # 기존 프로세스 확실히 종료 (fuser, netstat, ss 총동원)
-            fuser -k -n tcp 8000 || true
+            fuser -k -n tcp 8000 2>/dev/null || true
             PID=$(netstat -nlp 2>/dev/null | grep ':8000' | awk '{print $7}' | cut -d'/' -f1 || echo "")
             if [ ! -z "$PID" ]; then kill -9 $PID || true; fi
             PID=$(ss -lptn 'sport = :8000' 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -n 1 || echo "")
             if [ ! -z "$PID" ]; then kill -9 $PID || true; fi
-            kill $(lsof -t -i:8000) || true
             
-            # 리눅스 커널 프로세스 트리를 직접 뒤지는 가장 확실한 방법 (외부 패키지 의존성 없음)
-            for pid in /proc/[0-9]*; do
-              if grep -a "uvicorn" "$pid/cmdline" 2>/dev/null | grep -q "main:app" 2>/dev/null; then
-                kill -9 $(basename $pid) || true
+            # 리눅스 커널 프로세스 트리를 직접 뒤지는 가장 확실한 방법 (SSH 쉘 자살 방지 로직 포함)
+            for pid_dir in /proc/[0-9]*; do
+              # 실행 파일이 python인 경우에만 검사 (bash 스크립트 자살 방지)
+              if readlink "$pid_dir/exe" 2>/dev/null | grep -q "python"; then
+                if grep -a "uvicorn" "$pid_dir/cmdline" 2>/dev/null | grep -q "main:app" 2>/dev/null; then
+                  kill -9 $(basename $pid_dir) || true
+                fi
               fi
             done
             sleep 2
