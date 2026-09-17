@@ -49,24 +49,20 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             
-            # 기존 프로세스 확실히 종료 (가상환경의 Python(psutil)을 이용해 8000번 포트 프로세스 찾아서 죽이기)
-            $(pwd)/venv/bin/python -c "
-import psutil
-for conn in psutil.net_connections():
-    if conn.laddr.port == 8000 and conn.status == 'LISTEN':
-        try:
-            psutil.Process(conn.pid).terminate()
-        except:
-            pass
-" || true
-            # psutil이 없을 경우를 대비한 netstat 백업
+            # 기존 프로세스 확실히 종료 (fuser, netstat, ss 총동원)
+            fuser -k -n tcp 8000 || true
             PID=$(netstat -nlp 2>/dev/null | grep ':8000' | awk '{print $7}' | cut -d'/' -f1 || echo "")
             if [ ! -z "$PID" ]; then kill -9 $PID || true; fi
-            # netstat도 없을 경우 최신 리눅스 표준인 ss 명령어 사용
             PID=$(ss -lptn 'sport = :8000' 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -n 1 || echo "")
             if [ ! -z "$PID" ]; then kill -9 $PID || true; fi
-            # 그래도 안 되면 pkill로 uvicorn을 모조리 죽임 (단, 현재 스크립트가 죽지 않도록 조심)
-            pkill -x uvicorn || true
+            kill $(lsof -t -i:8000) || true
+            
+            # 리눅스 커널 프로세스 트리를 직접 뒤지는 가장 확실한 방법 (외부 패키지 의존성 없음)
+            for pid in /proc/[0-9]*; do
+              if grep -a "uvicorn" "$pid/cmdline" 2>/dev/null | grep -q "main:app" 2>/dev/null; then
+                kill -9 $(basename $pid) || true
+              fi
+            done
             sleep 2
             
             # 가상환경에서 Uvicorn 실행 (nohup과 /dev/null을 이용해 SSH 세션과 완벽 분리)

@@ -1,2 +1,1 @@
 asyncpg==0.31.0
-psutil==6.0.0
