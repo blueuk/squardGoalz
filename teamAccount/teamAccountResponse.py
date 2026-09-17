@@ -4,13 +4,13 @@ from datetime import datetime
 
 class TeamaccountResponse(BaseModel):
     team_uid: Optional[str] = None
-    team_account_seq: Optional[str] = None
+    team_account_seq: Optional[int] = None
     bank_cd: Optional[str] = None
     account_enc: Optional[str] = None
     create_id: Optional[str] = None
-    create_dt: Optional[str] = None
+    create_dt: Optional[datetime] = None
     update_id: Optional[str] = None
-    update_dt: Optional[str] = None
+    update_dt: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
