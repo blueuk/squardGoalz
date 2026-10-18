@@ -79,6 +79,12 @@ async def update(db: AsyncSession, req: scheduleRequest.ScheduleUpdateRequest, s
     return obj
 
 async def delete_obj(db: AsyncSession, req: scheduleRequest.ScheduleDeleteRequest):
+    await db.execute(
+        delete(TeamVoteL).where(
+            TeamVoteL.vote_seq == req.vote_seq,
+            TeamVoteL.team_uid == req.team_uid
+        )
+    )
     query = delete(TeamScheduleL)
     query = query.where(TeamScheduleL.vote_seq == req.vote_seq)
     query = query.where(TeamScheduleL.team_uid == req.team_uid)
