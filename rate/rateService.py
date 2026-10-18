@@ -14,7 +14,7 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
                 m.member_name,
                 m.user_id,
                 m.status_cd,
-                (SELECT code_name FROM common_cd_b WHERE code = m.status_cd AND group_cd = 'MEMBER_STATUS' LIMIT 1) AS code_name,
+                (SELECT code_name FROM common_cd_b WHERE code = m.status_cd AND group_cd = 'status_cd' LIMIT 1) AS code_name,
                 COUNT(v.vote_seq) AS total_matches,
                 COALESCE(SUM(CASE WHEN v.vote_cd = '02' THEN 1 ELSE 0 END), 0) AS attend_count,
                 COALESCE(SUM(CASE WHEN v.vote_cd = '03' THEN 1 ELSE 0 END), 0) AS absent_count,
