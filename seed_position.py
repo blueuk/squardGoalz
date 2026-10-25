@@ -1,22 +1,11 @@
 """
 포지션 공통코드 & 가중치 데이터 seed 스크립트
-실행: python seed_position.py
+실행: .\venv\Scripts\python.exe seed_position.py
 """
 import asyncio
-import os
 from datetime import datetime
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, text
-
-# .env에서 DATABASE_URL 읽기
-from dotenv import load_dotenv
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-
-engine = create_async_engine(DATABASE_URL, echo=False)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+from database import engine, async_session
+from sqlalchemy import text
 
 POSITIONS = [
     {'code': 'FIX', 'code_name': '픽소',    'seq': 1},
@@ -35,9 +24,25 @@ WEIGHTS = {
 }
 
 async def seed():
-    async with AsyncSessionLocal() as db:
+    async with async_session() as db:
         now = datetime.now()
         
+        # 0. 테이블 생성 (없는 경우)
+        print("position_point_b 테이블 확인/생성 중...")
+        await db.execute(text("""
+            CREATE TABLE IF NOT EXISTS position_point_b (
+                position_cd VARCHAR(50) NOT NULL,
+                score_cd VARCHAR(20) NOT NULL,
+                position_val NUMERIC(10, 4),
+                create_id VARCHAR(50),
+                create_dt TIMESTAMP,
+                update_id VARCHAR(50),
+                update_dt TIMESTAMP,
+                PRIMARY KEY (position_cd, score_cd)
+            );
+        """))
+        await db.commit()
+
         # 1. 포지션 공통코드 등록
         print("포지션 공통코드 등록 중...")
         for pos in POSITIONS:
@@ -46,7 +51,8 @@ async def seed():
                 VALUES (:group_cd, :code, :code_name, :seq, 'Y', 'system', :now, 'system', :now)
                 ON CONFLICT (group_cd, code) DO UPDATE SET code_name = EXCLUDED.code_name, use_yn = 'Y', update_dt = :now
             """), {'group_cd': 'position_cd', 'code': pos['code'], 'code_name': pos['code_name'], 'seq': pos['seq'], 'now': now})
-        
+        await db.commit()
+
         # 2. 포지션 가중치 등록
         print("포지션 가중치 등록 중...")
         for position_cd, weights in WEIGHTS.items():
@@ -64,4 +70,3 @@ async def seed():
 
 if __name__ == "__main__":
     asyncio.run(seed())
-
