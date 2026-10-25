@@ -18,7 +18,7 @@ class CommonGroupCdUpdateRequest(BaseModel):
     end_date: Optional[str] = None
 
 class CommonCdSearchRequest(BaseModel):
-    group_cd: str
+    group_cd: Optional[str] = None
     code: Optional[str] = None
     use_yn: str = 'Y'
 

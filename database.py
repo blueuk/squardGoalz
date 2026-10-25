@@ -13,12 +13,17 @@ DB_NAME = os.getenv("DB_NAME")
 # 비동기 통신을 위해 postgresql+asyncpg 드라이버를 사용합니다.
 SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
-# echo=True 설정으로 SQL 쿼리 로그를 출력합니다.
-# Neon DB 특성상 유휴 연결이 끊길 수 있으므로 pool_pre_ping=True, pool_recycle=1800 옵션을 추가합니다.
+# 성능 최적화:
+# 1. echo=False 로 I/O 로깅 병목 제거
+# 2. pool_size=20, max_overflow=20 으로 동시 요청 시 큐 대기 방지
+# 3. pool_pre_ping=True 로 유휴 끊김 방지
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL, 
-    echo=True, 
+    echo=False, 
     future=True,
+    pool_size=20,
+    max_overflow=20,
+    pool_timeout=30,
     pool_pre_ping=True,
     pool_recycle=1800
 )
