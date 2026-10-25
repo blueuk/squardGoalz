@@ -5,7 +5,8 @@ from typing import List
 from database import get_db
 from position_point.positionRequest import (
     PositionPointSearchRequest, PositionPointInsertRequest,
-    PositionPointUpdateRequest, PositionPointDeleteRequest
+    PositionPointUpdateRequest, PositionPointDeleteRequest,
+    PositionPointBulkUpsertRequest
 )
 from position_point.positionResponse import PositionPointResponse, MessageResponse
 from position_point import positionService
@@ -28,13 +29,41 @@ async def search_position_points(req: PositionPointSearchRequest = Depends(), db
 
 @router.post("/insert", response_model=MessageResponse)
 async def insert_position_point(req: PositionPointInsertRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """POST 방식으로 데이터를 등록하며 공통코드 존재 여부를 검증합니다."""
+    """POST 방식으로 데이터를 등록합니다."""
     userid = get_session_userid(request)
     try:
         await positionService.insert_position_point(db, req, userid)
         return MessageResponse(message="가중치 점수 등록 완료")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/upsert", response_model=MessageResponse)
+async def upsert_position_point(req: PositionPointUpdateRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """POST 방식으로 position_cd + score_cd 키로 upsert합니다."""
+    userid = get_session_userid(request)
+    try:
+        await positionService.upsert_position_point(db, req, userid)
+        return MessageResponse(message="가중치 점수 upsert 완료")
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/bulk_upsert", response_model=MessageResponse)
+async def bulk_upsert_position_points(req: PositionPointBulkUpsertRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """포지션 전체 가중치를 일괄 upsert합니다."""
+    userid = get_session_userid(request)
+    try:
+        for item in req.items:
+            upsert_req = PositionPointUpdateRequest(
+                position_cd=item.position_cd,
+                score_cd=item.score_cd,
+                position_val=item.position_val
+            )
+            await positionService.upsert_position_point(db, upsert_req, userid)
+        return MessageResponse(message=f"{len(req.items)}개 가중치 저장 완료")
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -55,7 +84,7 @@ async def update_position_point(req: PositionPointUpdateRequest, request: Reques
 @router.post("/delete", response_model=MessageResponse)
 async def delete_position_point(req: PositionPointDeleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """POST 방식으로 필수 키값(position_cd, score_cd)을 받아 삭제합니다."""
-    get_session_userid(request) # 로그인 체크용
+    get_session_userid(request)
     try:
         await positionService.delete_position_point(db, req)
         return MessageResponse(message="가중치 점수 삭제 완료")
@@ -64,4 +93,3 @@ async def delete_position_point(req: PositionPointDeleteRequest, request: Reques
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-

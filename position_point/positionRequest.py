@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class PositionPointSearchRequest(BaseModel):
     position_cd: Optional[str] = None
@@ -19,3 +19,10 @@ class PositionPointDeleteRequest(BaseModel):
     position_cd: str
     score_cd: str
 
+class PositionPointBulkUpsertItemRequest(BaseModel):
+    position_cd: str
+    score_cd: str
+    position_val: float
+
+class PositionPointBulkUpsertRequest(BaseModel):
+    items: List[PositionPointBulkUpsertItemRequest]
