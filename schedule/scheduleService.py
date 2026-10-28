@@ -4,6 +4,7 @@ from datetime import datetime
 from models.TeamScheduleL import TeamScheduleL
 from models.TeamMemberL import TeamMemberL
 from models.TeamVoteL import TeamVoteL
+from models.TeamArrangeL import TeamArrangeL
 from schedule import scheduleRequest
 
 async def get(db: AsyncSession, req: scheduleRequest.ScheduleSearchRequest):
@@ -86,6 +87,12 @@ async def delete_obj(db: AsyncSession, req: scheduleRequest.ScheduleDeleteReques
         delete(TeamVoteL).where(
             TeamVoteL.vote_seq == req.vote_seq,
             TeamVoteL.team_uid == req.team_uid
+        )
+    )
+    await db.execute(
+        delete(TeamArrangeL).where(
+            TeamArrangeL.vote_seq == req.vote_seq,
+            TeamArrangeL.team_uid == req.team_uid
         )
     )
     query = delete(TeamScheduleL)

@@ -1,20 +1,22 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class TeamarrangeSearchRequest(BaseModel):
-    vote_uid: Optional[str] = None
+    team_uid: Optional[str] = None
+    vote_seq: Optional[int] = None
 
-class TeamarrangeInsertRequest(BaseModel):
-    vote_uid: str
-    play_date: Optional[str] = None
-    team_cd: Optional[str] = None
-    member_id: Optional[str] = None
+class TeamarrangeMemberItemRequest(BaseModel):
+    member_uid: str
+    member_name: str
+    merc_yn: str = 'N'
+    team_no: int
+    keeper_order: int
 
-class TeamarrangeUpdateRequest(BaseModel):
-    vote_uid: str
-    play_date: Optional[str] = None
-    team_cd: Optional[str] = None
-    member_id: Optional[str] = None
+class TeamarrangeSaveRequest(BaseModel):
+    team_uid: str
+    vote_seq: int
+    members: List[TeamarrangeMemberItemRequest]
 
 class TeamarrangeDeleteRequest(BaseModel):
-    vote_uid: str
+    team_uid: str
+    vote_seq: int
