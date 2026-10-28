@@ -28,3 +28,10 @@ class TeamMemberTerminateRequest(BaseModel):
     team_uid: str
     member_uid: str
 
+class TeamMemberRestoreRequest(BaseModel):
+    team_uid: str
+    member_uid: str
+
+class TeamMemberDeleteRequest(BaseModel):
+    team_uid: str
+    member_uid: str

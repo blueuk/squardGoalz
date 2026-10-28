@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 
 from database import get_db
+from models.UserB import UserB
 from teamMember.teamMemberRequest import (
     TeamMemberSearchRequest, TeamMemberInsertRequest,
-    TeamMemberUpdateRequest, TeamMemberTerminateRequest
+    TeamMemberUpdateRequest, TeamMemberTerminateRequest,
+    TeamMemberRestoreRequest, TeamMemberDeleteRequest
 )
 from teamMember.teamMemberResponse import TeamMemberResponse, MessageResponse
 from teamMember import teamMemberService
@@ -16,6 +19,13 @@ def get_session_userid(request: Request) -> str:
     userid = request.session.get("userid")
     if not userid:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return userid
+
+async def get_admin_userid(request: Request, db: AsyncSession) -> str:
+    userid = get_session_userid(request)
+    result = await db.execute(select(UserB.auth_cd).where(UserB.userid == userid))
+    if result.scalar() != "01":  # 01: 관리자
+        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
     return userid
 
 @router.get("/search", response_model=List[TeamMemberResponse])
@@ -63,3 +73,37 @@ async def terminate_team_member(req: TeamMemberTerminateRequest, request: Reques
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/terminated/search", response_model=List[TeamMemberResponse])
+async def search_terminated_members(request: Request, req: TeamMemberSearchRequest = Depends(), db: AsyncSession = Depends(get_db)):
+    """[관리자] GET 방식으로 탈퇴자 목록을 검색합니다 (teamname, member_name LIKE)."""
+    await get_admin_userid(request, db)
+    try:
+        return await teamMemberService.get_terminated_members(db, req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/restore", response_model=MessageResponse)
+async def restore_team_member(req: TeamMemberRestoreRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[관리자] POST 방식으로 탈퇴자를 선수단 목록으로 복구합니다."""
+    await get_admin_userid(request, db)
+    try:
+        await teamMemberService.restore_team_member(db, req)
+        return MessageResponse(message="멤버 복구 완료")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/delete", response_model=MessageResponse)
+async def delete_team_member(req: TeamMemberDeleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[관리자] POST 방식으로 탈퇴자를 완전 삭제합니다 (점수/투표/기록 포함)."""
+    await get_admin_userid(request, db)
+    try:
+        await teamMemberService.delete_team_member(db, req)
+        return MessageResponse(message="멤버 완전 삭제 완료")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

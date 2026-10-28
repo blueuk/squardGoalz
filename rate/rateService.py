@@ -24,7 +24,7 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
             LEFT JOIN team_schedule_l s ON s.team_uid = m.team_uid AND substring(s.play_date from 1 for 4) = :year
             LEFT JOIN team_vote_l v ON v.vote_seq = s.vote_seq AND v.team_uid = m.team_uid AND v.member_uid = m.member_uid
                 AND v.vote_cd IN ('01', '02', '03')
-            WHERE 1=1
+            WHERE m.terminate_dt IS NULL
     """
     
     params = {"year": req.year}

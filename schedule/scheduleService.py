@@ -34,8 +34,11 @@ async def insert(db: AsyncSession, req: scheduleRequest.ScheduleInsertRequest, s
     db.add(obj)
     await db.flush() # vote_seq를 먼저 할당받기 위함
 
-    # 2. 모든 멤버 조회
-    member_query = select(TeamMemberL).filter(TeamMemberL.team_uid == req.team_uid)
+    # 2. 모든 멤버 조회 (탈퇴자 제외)
+    member_query = select(TeamMemberL).filter(
+        TeamMemberL.team_uid == req.team_uid,
+        TeamMemberL.terminate_dt.is_(None)
+    )
     members_result = await db.execute(member_query)
     members = members_result.scalars().all()
 
