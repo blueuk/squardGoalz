@@ -26,3 +26,10 @@ class PositionPointBulkUpsertItemRequest(BaseModel):
 
 class PositionPointBulkUpsertRequest(BaseModel):
     items: List[PositionPointBulkUpsertItemRequest]
+
+class ScoreItemInsertRequest(BaseModel):
+    code_name: str
+    category: Optional[str] = None  # 능력치 리포트 분류 (physical, technique, defense, mental, etc)
+
+class ScoreItemDeleteRequest(BaseModel):
+    score_cd: str

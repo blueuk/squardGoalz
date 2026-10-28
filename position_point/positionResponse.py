@@ -16,3 +16,9 @@ class PositionPointResponse(BaseModel):
 class MessageResponse(BaseModel):
     message: str
 
+class ScoreItemResponse(BaseModel):
+    score_cd: str
+    code_name: str
+    code_seq: int
+    category: Optional[str] = None
+    member_count: int

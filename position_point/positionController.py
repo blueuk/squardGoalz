@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 
 from database import get_db
+from models.UserB import UserB
 from position_point.positionRequest import (
     PositionPointSearchRequest, PositionPointInsertRequest,
     PositionPointUpdateRequest, PositionPointDeleteRequest,
-    PositionPointBulkUpsertRequest
+    PositionPointBulkUpsertRequest, ScoreItemInsertRequest, ScoreItemDeleteRequest
 )
-from position_point.positionResponse import PositionPointResponse, MessageResponse
+from position_point.positionResponse import PositionPointResponse, MessageResponse, ScoreItemResponse
 from position_point import positionService
 
 router = APIRouter(prefix="/position_point", tags=["PositionPoint"])
@@ -17,6 +19,13 @@ def get_session_userid(request: Request) -> str:
     userid = request.session.get("userid")
     if not userid:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return userid
+
+async def get_admin_userid(request: Request, db: AsyncSession) -> str:
+    userid = get_session_userid(request)
+    result = await db.execute(select(UserB.auth_cd).where(UserB.userid == userid))
+    if result.scalar() != "01":  # 01: 관리자
+        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
     return userid
 
 @router.get("/search", response_model=List[PositionPointResponse])
@@ -53,16 +62,10 @@ async def upsert_position_point(req: PositionPointUpdateRequest, request: Reques
 
 @router.post("/bulk_upsert", response_model=MessageResponse)
 async def bulk_upsert_position_points(req: PositionPointBulkUpsertRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """포지션 전체 가중치를 일괄 upsert합니다."""
-    userid = get_session_userid(request)
+    """[관리자] 변경된 가중치를 한 번의 트랜잭션으로 일괄 upsert합니다."""
+    userid = await get_admin_userid(request, db)
     try:
-        for item in req.items:
-            upsert_req = PositionPointUpdateRequest(
-                position_cd=item.position_cd,
-                score_cd=item.score_cd,
-                position_val=item.position_val
-            )
-            await positionService.upsert_position_point(db, upsert_req, userid)
+        await positionService.bulk_upsert_position_points(db, req.items, userid)
         return MessageResponse(message=f"{len(req.items)}개 가중치 저장 완료")
     except Exception as e:
         await db.rollback()
@@ -88,6 +91,31 @@ async def delete_position_point(req: PositionPointDeleteRequest, request: Reques
     try:
         await positionService.delete_position_point(db, req)
         return MessageResponse(message="가중치 점수 삭제 완료")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/score_item/insert", response_model=ScoreItemResponse)
+async def insert_score_item(req: ScoreItemInsertRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[관리자] 능력치(가중치) 항목을 추가합니다. 모든 포지션 가중치 0, 선수단 전원 기본점수 10점."""
+    userid = await get_admin_userid(request, db)
+    try:
+        return await positionService.insert_score_item(db, req, userid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/score_item/delete", response_model=MessageResponse)
+async def delete_score_item(req: ScoreItemDeleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[관리자] 능력치(가중치) 항목과 연결된 가중치 / 선수 점수를 삭제합니다."""
+    await get_admin_userid(request, db)
+    try:
+        await positionService.delete_score_item(db, req)
+        return MessageResponse(message="능력치 항목 삭제 완료")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
