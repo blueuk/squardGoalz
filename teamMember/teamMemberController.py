@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from typing import List
 
 from database import get_db
-from models.UserB import UserB
+from auth import require_permission, require_self_or_permission
 from teamMember.teamMemberRequest import (
     TeamMemberSearchRequest, TeamMemberInsertRequest,
     TeamMemberUpdateRequest, TeamMemberTerminateRequest,
@@ -14,19 +13,6 @@ from teamMember.teamMemberResponse import TeamMemberResponse, MessageResponse
 from teamMember import teamMemberService
 
 router = APIRouter(prefix="/team_member", tags=["TeamMember"])
-
-def get_session_userid(request: Request) -> str:
-    userid = request.session.get("userid")
-    if not userid:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    return userid
-
-async def get_admin_userid(request: Request, db: AsyncSession) -> str:
-    userid = get_session_userid(request)
-    result = await db.execute(select(UserB.auth_cd).where(UserB.userid == userid))
-    if result.scalar() != "01":  # 01: 관리자
-        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
-    return userid
 
 @router.get("/search", response_model=List[TeamMemberResponse])
 async def search_team_members(req: TeamMemberSearchRequest = Depends(), db: AsyncSession = Depends(get_db)):
@@ -39,7 +25,7 @@ async def search_team_members(req: TeamMemberSearchRequest = Depends(), db: Asyn
 @router.post("/insert", response_model=MessageResponse)
 async def insert_team_members(req: TeamMemberInsertRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """POST 방식으로 멤버 정보를 리스트 형태로 대량(Bulk) Insert 합니다."""
-    userid = get_session_userid(request)
+    userid = await require_permission(request, db, 'member.manage')
     try:
         await teamMemberService.insert_team_members(db, req, userid)
         return MessageResponse(message=f"{len(req.members)}명의 멤버가 등록되었습니다.")
@@ -50,7 +36,7 @@ async def insert_team_members(req: TeamMemberInsertRequest, request: Request, db
 @router.post("/update", response_model=MessageResponse)
 async def update_team_member(req: TeamMemberUpdateRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """POST 방식으로 개별 멤버의 정보를 수정합니다."""
-    get_session_userid(request)
+    await require_self_or_permission(request, db, req.team_uid, req.member_uid, 'member.manage')
     try:
         await teamMemberService.update_team_member(db, req)
         return MessageResponse(message="멤버 정보 수정 완료")
@@ -63,7 +49,7 @@ async def update_team_member(req: TeamMemberUpdateRequest, request: Request, db:
 @router.post("/terminate", response_model=MessageResponse)
 async def terminate_team_member(req: TeamMemberTerminateRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """POST 방식으로 멤버의 탈퇴일자(terminate_dt)를 기록합니다."""
-    get_session_userid(request)
+    await require_permission(request, db, 'member.manage')
     try:
         await teamMemberService.terminate_team_member(db, req)
         return MessageResponse(message="멤버 탈퇴(종료) 처리 완료")
@@ -75,8 +61,8 @@ async def terminate_team_member(req: TeamMemberTerminateRequest, request: Reques
 
 @router.get("/terminated/search", response_model=List[TeamMemberResponse])
 async def search_terminated_members(request: Request, req: TeamMemberSearchRequest = Depends(), db: AsyncSession = Depends(get_db)):
-    """[관리자] GET 방식으로 탈퇴자 목록을 검색합니다 (teamname, member_name LIKE)."""
-    await get_admin_userid(request, db)
+    """[권한: member.terminated] GET 방식으로 탈퇴자 목록을 검색합니다 (teamname, member_name LIKE)."""
+    await require_permission(request, db, 'member.terminated')
     try:
         return await teamMemberService.get_terminated_members(db, req)
     except Exception as e:
@@ -84,8 +70,8 @@ async def search_terminated_members(request: Request, req: TeamMemberSearchReque
 
 @router.post("/restore", response_model=MessageResponse)
 async def restore_team_member(req: TeamMemberRestoreRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """[관리자] POST 방식으로 탈퇴자를 선수단 목록으로 복구합니다."""
-    await get_admin_userid(request, db)
+    """[권한: member.terminated] POST 방식으로 탈퇴자를 선수단 목록으로 복구합니다."""
+    await require_permission(request, db, 'member.terminated')
     try:
         await teamMemberService.restore_team_member(db, req)
         return MessageResponse(message="멤버 복구 완료")
@@ -97,8 +83,8 @@ async def restore_team_member(req: TeamMemberRestoreRequest, request: Request, d
 
 @router.post("/delete", response_model=MessageResponse)
 async def delete_team_member(req: TeamMemberDeleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """[관리자] POST 방식으로 탈퇴자를 완전 삭제합니다 (점수/투표/기록 포함)."""
-    await get_admin_userid(request, db)
+    """[권한: member.terminated] POST 방식으로 탈퇴자를 완전 삭제합니다 (점수/투표/기록 포함)."""
+    await require_permission(request, db, 'member.terminated')
     try:
         await teamMemberService.delete_team_member(db, req)
         return MessageResponse(message="멤버 완전 삭제 완료")

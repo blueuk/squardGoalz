@@ -22,6 +22,7 @@ from stardium.stardiumController import router as stardium_router
 from vote.voteController import router as vote_router
 from rate.rateController import router as rate_router
 from youtube.youtubeController import router as youtube_router
+from permission.permissionController import router as permission_router
 
 # 앱 생명주기 관리 (시작 및 종료 시 DB 연결/해제 설정)
 @asynccontextmanager
@@ -77,6 +78,7 @@ app.include_router(stardium_router)
 app.include_router(vote_router)
 app.include_router(rate_router)
 app.include_router(youtube_router)
+app.include_router(permission_router)
 
 @app.get("/")
 async def root():

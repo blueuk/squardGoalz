@@ -1,27 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from typing import List
 from database import get_db
-from models.UserB import UserB
+from auth import require_permission
 from teamArrange.teamArrangeRequest import *
 from teamArrange.teamArrangeResponse import *
 from teamArrange import teamArrangeService
 
 router = APIRouter(prefix='/teamArrange', tags=['Teamarrange'])
-
-def get_session_userid(request: Request) -> str:
-    userid = request.session.get("userid")
-    if not userid:
-        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    return userid
-
-async def get_admin_userid(request: Request, db: AsyncSession) -> str:
-    userid = get_session_userid(request)
-    result = await db.execute(select(UserB.auth_cd).where(UserB.userid == userid))
-    if result.scalar() != "01":  # 01: 관리자
-        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
-    return userid
 
 @router.get('/search', response_model=List[TeamarrangeResponse])
 async def search(req: TeamarrangeSearchRequest = Depends(), db: AsyncSession = Depends(get_db)):
@@ -30,8 +16,8 @@ async def search(req: TeamarrangeSearchRequest = Depends(), db: AsyncSession = D
 
 @router.post('/save', response_model=MessageResponse)
 async def save(req: TeamarrangeSaveRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """[관리자] 일정의 팀 배정을 저장합니다. 기존 배정이 있으면 교체합니다."""
-    userid = await get_admin_userid(request, db)
+    """[권한: arrange.manage] 일정의 팀 배정을 저장합니다. 기존 배정이 있으면 교체합니다."""
+    userid = await require_permission(request, db, 'arrange.manage')
     try:
         await teamArrangeService.save(db, req, userid)
         return MessageResponse(message=f'{len(req.members)}명 팀 배정 저장 완료')
@@ -43,8 +29,8 @@ async def save(req: TeamarrangeSaveRequest, request: Request, db: AsyncSession =
 
 @router.post('/delete', response_model=MessageResponse)
 async def delete(req: TeamarrangeDeleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """[관리자] 일정의 팀 배정 이력을 삭제합니다."""
-    await get_admin_userid(request, db)
+    """[권한: arrange.manage] 일정의 팀 배정 이력을 삭제합니다."""
+    await require_permission(request, db, 'arrange.manage')
     try:
         await teamArrangeService.delete_obj(db, req)
         return MessageResponse(message='팀 배정 삭제 완료')
