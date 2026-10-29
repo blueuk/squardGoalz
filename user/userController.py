@@ -46,17 +46,22 @@ async def get_users(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"조회 중 오류 발생: {str(e)}")
 
+async def ensure_not_last_admin(db: AsyncSession, userid: str, detail: str):
+    """대상이 유일한 관리자라면 막음 (관리자가 없으면 아무도 권한을 관리할 수 없음)"""
+    if await get_auth_cd(db, userid) != ADMIN_AUTH_CD:
+        return
+    admin_count = (await db.execute(
+        select(func.count()).select_from(UserB).where(UserB.auth_cd == ADMIN_AUTH_CD)
+    )).scalar()
+    if admin_count <= 1:
+        raise HTTPException(status_code=400, detail=detail)
+
 @router.post("/update", response_model=MessageResponse)
 async def update_user(req: UserUpdateRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """[관리자] UserB 정보(권한 포함)를 업데이트하고 해당 이력을 UserH에 새로 삽입"""
     await get_admin_userid(request, db)
-    # 마지막 관리자의 권한을 내리면 아무도 권한을 관리할 수 없게 되므로 막음
-    if req.auth_cd is not None and req.auth_cd != ADMIN_AUTH_CD and await get_auth_cd(db, req.userid) == ADMIN_AUTH_CD:
-        admin_count = (await db.execute(
-            select(func.count()).select_from(UserB).where(UserB.auth_cd == ADMIN_AUTH_CD)
-        )).scalar()
-        if admin_count <= 1:
-            raise HTTPException(status_code=400, detail="마지막 관리자의 권한은 변경할 수 없습니다.")
+    if req.auth_cd is not None and req.auth_cd != ADMIN_AUTH_CD:
+        await ensure_not_last_admin(db, req.userid, "관리자는 최소 1명 이상 있어야 합니다.")
     try:
         updated_user = await userService.update_user(db, req)
         if not updated_user:
@@ -72,6 +77,7 @@ async def update_user(req: UserUpdateRequest, request: Request, db: AsyncSession
 async def delete_user(userid: str, request: Request, db: AsyncSession = Depends(get_db)):
     """[관리자] UserB 정보를 삭제하고 연결된 UserH 이력도 모두 삭제합니다."""
     await get_admin_userid(request, db)
+    await ensure_not_last_admin(db, userid, "관리자는 최소 1명 이상 있어야 하므로 마지막 관리자는 삭제할 수 없습니다.")
     try:
         is_deleted = await userService.delete_user(db, userid)
         if not is_deleted:
