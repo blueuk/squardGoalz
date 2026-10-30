@@ -35,6 +35,13 @@ async def get_permissions(db: AsyncSession, userid: str) -> list:
     result = await db.execute(select(AuthRolePermissionL.perm_cd).where(AuthRolePermissionL.auth_cd == auth_cd))
     return list(result.scalars().all())
 
+async def is_member_linked(db: AsyncSession, userid: str) -> bool:
+    """선수 명단(탈퇴하지 않은 멤버)에 연결된 계정인지. 아니면 가입 승인 대기"""
+    result = await db.execute(
+        select(TeamMemberL.member_uid).where(TeamMemberL.user_id == userid, TeamMemberL.terminate_dt.is_(None)).limit(1)
+    )
+    return result.scalar() is not None
+
 async def has_permission(db: AsyncSession, userid: str, perm_cd: str) -> bool:
     return perm_cd in await get_permissions(db, userid)
 

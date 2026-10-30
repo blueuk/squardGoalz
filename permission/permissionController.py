@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from auth import get_session_userid, get_admin_userid, get_auth_cd, get_permissions
+from auth import get_session_userid, get_admin_userid, get_auth_cd, get_permissions, is_member_linked, ADMIN_AUTH_CD
 from permission.permissionRequest import PermissionSaveRequest
 from permission.permissionResponse import MyPermissionResponse, PermissionMatrixResponse, MessageResponse
 from permission import permissionService
@@ -13,10 +13,13 @@ router = APIRouter(prefix="/permission", tags=["Permission"])
 async def get_my_permissions(request: Request, db: AsyncSession = Depends(get_db)):
     """[로그인] 내 역할과 기능 권한 목록"""
     userid = get_session_userid(request)
+    auth_cd = await get_auth_cd(db, userid)
     return MyPermissionResponse(
         userid=userid,
-        auth_cd=await get_auth_cd(db, userid),
+        auth_cd=auth_cd,
         permissions=await get_permissions(db, userid),
+        # 관리자는 선수가 아니어도 승인 대기 아님
+        approved=auth_cd == ADMIN_AUTH_CD or await is_member_linked(db, userid),
     )
 
 @router.get("/matrix", response_model=PermissionMatrixResponse)

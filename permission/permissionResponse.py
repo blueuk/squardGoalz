@@ -5,6 +5,7 @@ class MyPermissionResponse(BaseModel):
     userid: str
     auth_cd: Optional[str] = None
     permissions: List[str]
+    approved: bool = True  # False: 가입했지만 선수 명단에 연결되지 않은 승인 대기
 
 class PermissionItemResponse(BaseModel):
     perm_cd: str

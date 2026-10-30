@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
+from auth import get_session_userid
 
 from login import loginService
 from user import userService
@@ -40,22 +41,31 @@ async def process_kakao_login(request: Request, db: AsyncSession = Depends(get_d
 
 @router.post("/register")
 async def register(
-    userid: str = Form(...),
+    request: Request,
     username: str = Form(...),
     nickname: str = Form(...),
     phone: str = Form(...),
     db: AsyncSession = Depends(get_db)
 ):
-    # 가입 폼에서 넘어온 정보를 user/insert 로직을 이용해 등록
+    # 카카오 ID는 폼 값이 아니라 카카오 로그인 세션에서 가져옴 (임의 ID로 가입 방지)
+    userid = get_session_userid(request)
+    if await userService.get_users(db, userid=userid):
+        raise HTTPException(status_code=400, detail="이미 가입된 계정입니다. 다시 로그인해주세요.")
+
     req = UserInsertRequest(
         userid=userid,
-        username=username,
-        nickname=nickname,
-        phone=phone,
+        username=username.strip(),
+        nickname=nickname.strip(),
+        phone=phone.strip(),
         auth_cd="02" # 02: 일반 사용자
     )
-    
-    await userService.insert_user(db, req)
-    
-    return {"message": "회원가입이 완료되었습니다."}
+
+    try:
+        linked = await userService.insert_user(db, req)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"회원가입 중 오류가 발생했습니다: {str(e)}")
+
+    # linked=False 이면 관리자가 가입 승인할 때까지 승인 대기
+    return {"message": "회원가입이 완료되었습니다.", "linked": linked}
 

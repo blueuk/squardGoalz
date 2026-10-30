@@ -17,6 +17,15 @@ class TeamMemberResponse(BaseModel):
     
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
+class PendingUserResponse(BaseModel):
+    userid: str
+    username: Optional[str] = None
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+    create_dt: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class MessageResponse(BaseModel):
     message: str
 

@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from datetime import datetime
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from datetime import datetime
 import uuid
 from models.UserB import UserB
@@ -18,11 +18,13 @@ async def get_next_seq(db: AsyncSession, userid: str) -> int:
     max_seq = result.scalar()
     return int(max_seq + 1) if max_seq else 1
 
-async def insert_user(db: AsyncSession, req: UserInsertRequest):
+async def insert_user(db: AsyncSession, req: UserInsertRequest) -> bool:
+    """유저 등록 (UserB + UserH). 이름이 같은 선수가 정확히 1명이면 연결하고 True 반환.
+    연결되지 않으면 관리자가 가입 승인(선수 연결/신규 등록)할 때까지 승인 대기 상태"""
     now = datetime.now()
-    
+
     # 1. USER_B (유저 기본정보) 등록
-    user_b = UserB(
+    db.add(UserB(
         userid=req.userid,
         username=req.username,
         nickname=req.nickname,
@@ -31,12 +33,11 @@ async def insert_user(db: AsyncSession, req: UserInsertRequest):
         create_dt=now,
         update_dt=now,
         use_yn='Y'
-    )
-    db.add(user_b)
-    
+    ))
+
     # 2. USER_H (유저 이력) 등록
     seq = await get_next_seq(db, req.userid)
-    user_h = UserH(
+    db.add(UserH(
         userid=req.userid,
         user_seq=seq,
         username=req.username,
@@ -46,58 +47,22 @@ async def insert_user(db: AsyncSession, req: UserInsertRequest):
         create_dt=now,
         update_dt=now,
         use_yn='Y'
-    )
-    db.add(user_h)
-    
+    ))
+
+    # 3. 탈퇴하지 않았고 아직 계정이 연결되지 않은 동명 선수가 정확히 1명일 때만 연결
+    #    (0명이거나 동명이인이 여럿이면 관리자 승인 대기)
+    candidates = (await db.execute(select(TeamMemberL).where(
+        TeamMemberL.member_name == req.username,
+        TeamMemberL.terminate_dt.is_(None),
+        or_(TeamMemberL.user_id.is_(None), TeamMemberL.user_id == '')
+    ))).scalars().all()
+    linked = len(candidates) == 1
+    if linked:
+        candidates[0].user_id = req.userid
+
+    # 계정 저장과 선수 연결을 한 번에 저장
     await db.commit()
-    
-    # 3. TeamMemberL 연동 또는 자동 등록
-    result = await db.execute(select(TeamMemberL).where(TeamMemberL.member_name == req.username))
-    members = result.scalars().all()
-    
-    if members:
-        # 4. 존재하면 해당 멤버들의 user_id를 업데이트
-        for m in members:
-            m.user_id = req.userid
-        await db.commit()
-    else:
-        # 5. 존재하지 않으면 기본 팀(첫 번째 팀)에 멤버로 새로 추가
-        team_result = await db.execute(select(TeamInfoB).where(TeamInfoB.use_yn == 'Y'))
-        first_team = team_result.scalars().first()
-        if first_team:
-            new_uid = str(uuid.uuid4())
-            new_member = TeamMemberL(
-                team_uid=first_team.team_uid,
-                member_uid=new_uid,
-                member_name=req.username,
-                user_id=req.userid,
-                sign_dt=now.strftime('%Y%m%d%H%M%S'),
-                gender_cd='01',  # 기본값
-                status_cd='01',  # 활동중
-                create_id='system',
-                create_dt=now
-            )
-            db.add(new_member)
-            
-            # 신규 멤버에게 모든 score_cd에 대해 13점 기본값 부여
-            score_cds = (await db.execute(select(CommonCdB).where(CommonCdB.group_cd == 'score_cd'))).scalars().all()
-            for sc in score_cds:
-                score_obj = TeamMemberScoreL(
-                    member_uid=new_uid,
-                    team_uid=first_team.team_uid,
-                    year='2026',
-                    score_cd=sc.code,
-                    score_val=13,
-                    create_id='system',
-                    create_dt=now,
-                    update_id='system',
-                    update_dt=now
-                )
-                db.add(score_obj)
-            
-            await db.commit()
-            
-    return user_b
+    return linked
 
 async def get_users(db: AsyncSession, userid: str = None, username: str = None, nickname: str = None, phone: str = None):
     query = select(UserB)
@@ -135,6 +100,9 @@ async def update_user(db: AsyncSession, req: UserUpdateRequest):
     # 그 외 주요 정보들(권한, 닉네임 등)이 기존과 다르게 변경되었을 때만 플래그 ON
     if req.use_yn is not None and user_b.use_yn != req.use_yn:
         user_b.use_yn = req.use_yn
+        needs_history = True
+    if req.username is not None and user_b.username != req.username:
+        user_b.username = req.username
         needs_history = True
     if req.nickname is not None and user_b.nickname != req.nickname:
         user_b.nickname = req.nickname

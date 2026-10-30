@@ -14,6 +14,7 @@ class UserUpdateRequest(BaseModel):
     ip: Optional[str] = None
     last_login_dt: Optional[datetime] = None
     use_yn: Optional[str] = None
+    username: Optional[str] = None
     nickname: Optional[str] = None
     kakao_name: Optional[str] = None
     auth_cd: Optional[str] = None

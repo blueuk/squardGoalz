@@ -35,3 +35,12 @@ class TeamMemberRestoreRequest(BaseModel):
 class TeamMemberDeleteRequest(BaseModel):
     team_uid: str
     member_uid: str
+
+class TeamMemberApproveRequest(BaseModel):
+    team_uid: str
+    userid: str
+    member_uid: Optional[str] = None  # 있으면 기존 선수에 연결, 없으면 신규 선수로 등록
+
+class TeamMemberRejectRequest(BaseModel):
+    team_uid: str
+    userid: str

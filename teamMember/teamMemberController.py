@@ -7,9 +7,10 @@ from auth import require_permission, require_self_or_permission
 from teamMember.teamMemberRequest import (
     TeamMemberSearchRequest, TeamMemberInsertRequest,
     TeamMemberUpdateRequest, TeamMemberTerminateRequest,
-    TeamMemberRestoreRequest, TeamMemberDeleteRequest
+    TeamMemberRestoreRequest, TeamMemberDeleteRequest,
+    TeamMemberApproveRequest, TeamMemberRejectRequest
 )
-from teamMember.teamMemberResponse import TeamMemberResponse, MessageResponse
+from teamMember.teamMemberResponse import TeamMemberResponse, PendingUserResponse, MessageResponse
 from teamMember import teamMemberService
 
 router = APIRouter(prefix="/team_member", tags=["TeamMember"])
@@ -90,6 +91,38 @@ async def delete_team_member(req: TeamMemberDeleteRequest, request: Request, db:
         return MessageResponse(message="멤버 완전 삭제 완료")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pending/search", response_model=List[PendingUserResponse])
+async def search_pending_users(team_uid: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """[권한: member.manage] 가입했지만 선수 명단에 연결되지 않은 승인 대기 회원 목록"""
+    await require_permission(request, db, 'member.manage')
+    return await teamMemberService.get_pending_users(db, team_uid)
+
+@router.post("/approve", response_model=MessageResponse)
+async def approve_pending_user(req: TeamMemberApproveRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[권한: member.manage] 승인 대기 회원을 기존 선수에 연결하거나 신규 선수로 등록합니다."""
+    userid = await require_permission(request, db, 'member.manage')
+    try:
+        await teamMemberService.approve_user(db, req, userid)
+        return MessageResponse(message="가입 승인 완료")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/reject", response_model=MessageResponse)
+async def reject_pending_user(req: TeamMemberRejectRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """[권한: member.manage] 승인 대기 회원의 가입을 거절(계정 삭제)합니다."""
+    await require_permission(request, db, 'member.manage')
+    try:
+        await teamMemberService.reject_user(db, req)
+        return MessageResponse(message="가입 거절 완료")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
