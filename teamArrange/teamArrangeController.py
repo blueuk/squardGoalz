@@ -14,6 +14,11 @@ async def search(req: TeamarrangeSearchRequest = Depends(), db: AsyncSession = D
     """일정(team_uid, vote_seq)의 팀 배정 이력을 팀번호, 키퍼순서 순으로 조회합니다."""
     return await teamArrangeService.get(db, req)
 
+@router.get('/next', response_model=NextArrangeResponse)
+async def search_next(req: TeamarrangeNextRequest = Depends(), db: AsyncSession = Depends(get_db)):
+    """메인 화면용: 오늘 포함 가장 가까운 일정과 그 팀 배정을 한 번에 조회합니다."""
+    return await teamArrangeService.get_next(db, req)
+
 @router.post('/save', response_model=MessageResponse)
 async def save(req: TeamarrangeSaveRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """[권한: arrange.manage] 일정의 팀 배정을 저장합니다. 기존 배정이 있으면 교체합니다."""

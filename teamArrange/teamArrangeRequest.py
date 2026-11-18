@@ -5,6 +5,10 @@ class TeamarrangeSearchRequest(BaseModel):
     team_uid: Optional[str] = None
     vote_seq: Optional[int] = None
 
+class TeamarrangeNextRequest(BaseModel):
+    team_uid: str
+    today: str  # YYYYMMDD (사용자 기준 오늘: 서버 시간대와 무관하게 비교)
+
 class TeamarrangeMemberItemRequest(BaseModel):
     member_uid: str
     member_name: str

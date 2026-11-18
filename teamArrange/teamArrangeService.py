@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from datetime import datetime
 from models.TeamArrangeL import TeamArrangeL
 from models.TeamScheduleL import TeamScheduleL
@@ -16,6 +16,23 @@ async def get(db: AsyncSession, req: teamArrangeRequest.TeamarrangeSearchRequest
     query = query.order_by(TeamArrangeL.team_no.asc(), TeamArrangeL.keeper_order.asc())
     result = await db.execute(query)
     return result.scalars().all()
+
+async def get_next(db: AsyncSession, req: teamArrangeRequest.TeamarrangeNextRequest):
+    """오늘을 포함한 미래 일정 중 가장 가까운 일정(같은 날이면 시작시간이 이른 일정)과 그 배정"""
+    schedule = (await db.execute(
+        select(TeamScheduleL)
+        .filter(TeamScheduleL.team_uid == req.team_uid, TeamScheduleL.play_date >= req.today)
+        .order_by(
+            TeamScheduleL.play_date.asc(),
+            func.coalesce(TeamScheduleL.play_start_time, '').asc(),
+            TeamScheduleL.vote_seq.asc(),
+        )
+        .limit(1)
+    )).scalars().first()
+    if not schedule:
+        return {"schedule": None, "arrangement": []}
+    arrangement = await get(db, teamArrangeRequest.TeamarrangeSearchRequest(team_uid=req.team_uid, vote_seq=schedule.vote_seq))
+    return {"schedule": schedule, "arrangement": arrangement}
 
 async def save(db: AsyncSession, req: teamArrangeRequest.TeamarrangeSaveRequest, session_id: str):
     """해당 일정의 기존 배정을 지우고 새 배정으로 통째로 교체합니다."""
