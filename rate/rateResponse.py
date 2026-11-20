@@ -14,4 +14,6 @@ class RateResponse(BaseModel):
     rank_num: int
     status_cd: str | None = None
     code_name: str | None = None
+    attend_streak: int = 0  # 최근 경기부터 연속 참석 수 (미진행 제외)
+    miss_streak: int = 0    # 최근 경기부터 연속 불참·미투표 수 (미진행 제외)
 

@@ -1,8 +1,48 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from typing import List
+from sqlalchemy import text, bindparam
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from rate.rateRequest import RateSearchRequest
 from rate.rateResponse import RateResponse
+
+async def get_streaks(db: AsyncSession, member_uids: set, team_uid: Optional[str], today: Optional[str]) -> Dict[str, Tuple[int, int]]:
+    """멤버별 (연속 참석 수, 연속 불참·미투표 수). 오늘 이전 경기를 최근부터 세고 미진행(04)은 건너뜀 (연도 구분 없음)"""
+    if not member_uids:
+        return {}
+    today = today or datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y%m%d')
+    sql = """
+        SELECT v.member_uid, v.vote_cd
+        FROM team_vote_l v
+        JOIN team_schedule_l s ON s.team_uid = v.team_uid AND s.vote_seq = v.vote_seq
+        WHERE s.play_date < :today
+          AND v.vote_cd IN ('01', '02', '03')
+          AND v.member_uid IN :member_uids
+    """
+    params = {"today": today, "member_uids": list(member_uids)}
+    if team_uid:
+        sql += " AND v.team_uid = :team_uid"
+        params["team_uid"] = team_uid
+    sql += " ORDER BY v.member_uid, s.play_date DESC, s.vote_seq DESC"
+
+    query = text(sql).bindparams(bindparam("member_uids", expanding=True))
+    return count_streaks((await db.execute(query, params)).fetchall())
+
+def count_streaks(rows) -> Dict[str, Tuple[int, int]]:
+    """(member_uid, vote_cd) 를 멤버별 최근 경기 순으로 받아 연속 참석 / 연속 불참·미투표 수를 셈"""
+    streaks: Dict[str, Tuple[int, int]] = {}
+    done = set()  # 연속이 끊긴 멤버
+    for member_uid, vote_cd in rows:
+        if member_uid in done:
+            continue
+        attend, miss = streaks.get(member_uid, (0, 0))
+        if vote_cd == '02' and miss == 0:
+            streaks[member_uid] = (attend + 1, 0)
+        elif vote_cd in ('01', '03') and attend == 0:
+            streaks[member_uid] = (0, miss + 1)
+        else:
+            done.add(member_uid)
+    return streaks
 
 async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateResponse]:
     # Construct base query
@@ -72,7 +112,8 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
     
     result = await db.execute(text(base_sql), params)
     rows = result.fetchall()
-    
+    streaks = await get_streaks(db, {row.member_uid for row in rows}, req.team_uid, req.today)
+
     return [
         RateResponse(
             team_uid=row.team_uid,
@@ -91,7 +132,9 @@ async def get_rates(db: AsyncSession, req: RateSearchRequest) -> List[RateRespon
                 '활동' if row.status_cd == '01' else 
                 '부상' if row.status_cd == '02' else 
                 '휴식' if row.status_cd == '03' else ''
-            )
+            ),
+            attend_streak=streaks.get(row.member_uid, (0, 0))[0],
+            miss_streak=streaks.get(row.member_uid, (0, 0))[1],
         ) for row in rows
     ]
 
